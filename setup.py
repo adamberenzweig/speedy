@@ -11,7 +11,7 @@ setup(
     packages = ['httprpc'],
     install_requires = [
       'Mako>=0.4.2',
-      'distribute>=0.6.19'
+      'distribute>=0.6.19',
       'eventlet>=0.9.16'
     ]
 )
