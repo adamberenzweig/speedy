@@ -33,7 +33,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         path = self.path, headers = self.headers, data = data)
       code = 200
     except KeyError:
-      self.send_response(404, '')
+      code = 404
+      response = ''
     finally:
       self.reply(code, response)
 
@@ -45,7 +46,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         path = self.path, headers = self.headers, data = None)
       code = 200
     except KeyError:
-      self.send_response(404, '')
+      code = 404
+      response = ''
     finally:
       self.reply(code, response)
 
