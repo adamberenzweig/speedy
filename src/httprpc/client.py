@@ -1,35 +1,8 @@
 #!/usr/bin/env python
 
-from eventlet.green import httplib
-from httprpc import proto
-from httprpc.common import ServerErrorResponse, ServerError
+from httprpc import internal
 
 class Client(object):
-  class Stub(object):
-    def __init__(self, host, port, method):
-      self.host = host
-      self.port = port
-      self.http = httplib.HTTPConnection(host, port)
-      self.method = method
-
-    def __call__(self, message):
-      message.validate()
-      self.http.request('POST', '/rpc/%s' % self.method, proto.store(message))
-#      log.info('Sent request...')
-      resp = self.http.getresponse()
-      message = proto.load(resp.read(int(resp.getheader('content-length'))))
-#      log.info('Got response...')
-
-      # the server returned an exception to us; reraise it
-      if isinstance(message, ServerErrorResponse):
-        # prefix each line with the server host:port
-        tb = '\n' + '\n'.join(['%s:%s -- %s' % (self.host, self.port, line)
-                               for line in message.traceback.split('\n')])
-
-        raise ServerError, tb
-
-      return message
-
   def __init__(self, host, port):
     self._host = host
     self._port = port
@@ -43,5 +16,53 @@ class Client(object):
 
   def __getattr__(self, k):
     if not k in self.__dict__:
-      return Client.Stub(self._host, self._port, k)
+      return RemoteObjectProxy(internal.Channel(self._host, self._port), k)
     raise KeyError
+
+
+class CallStub(object):
+  def __init__(self, channel, objectid, method):
+    self._channel = channel
+    self._objectid = objectid
+    self._method = method
+
+  def __call__(self, *args, **kw):
+#    logging.info('Calling %s %s %s %s', self._objectid, self._method, args, kw)
+    req = internal.ServerRequest(
+      method = self._method,
+      args = [internal.store(arg) for arg in args],
+      kw = dict([(k, internal.store(v)) for (k, v) in kw]))
+
+    path = '/rpc/invoke/%s' % self._objectid
+    self._channel.request('POST', path, internal.store(req))
+    resp = self._channel.getresponse()
+    if resp.status != 200:
+      raise internal.ServerError, 'Error connecting to %s%s -- %d' % (
+        self._channel, path, resp.status)
+
+    resp_data = resp.read(int(resp.getheader('content-length')))
+    message = internal.load(resp_data)
+
+#    logging.info('Response: %s', resp_data)
+
+    assert isinstance(message, internal.ServerResponse)
+
+    # the server returned an exception to us; reraise it
+    if message.exc_info is not None:
+      exc_info = message.exc_info
+      tb = '\n' + '\n'.join(['%s -- %s' % (self._channel, line)
+                             for line in exc_info.traceback.split('\n')])
+
+      raise internal.ServerError, tb
+    elif message.objectid:
+      return RemoteObjectProxy(self._channel, message.objectid)
+    else:
+      return message.data
+
+class RemoteObjectProxy(object):
+  def __init__(self, channel, objectid):
+    self._channel = channel
+    self._objectid = objectid
+
+  def __getattr__(self, k):
+    return CallStub(self._channel, self._objectid, k)

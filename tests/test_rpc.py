@@ -1,30 +1,34 @@
 #!/usr/bin/env python
 
 from eventlet import greenpool
-from httprpc import proto, log
-import httprpc.common
 import httprpc.client
+import httprpc.common
 import httprpc.server
+import logging
 import unittest
 
-class TestMessage(proto.Message):
-  FIELDS = {
-    'str' : proto.Field.String(),
-    'int' : proto.Field.Int(),
-  }
+class MockObject(object):
+  def test_echo(self, v):
+    return v
 
-class MockServer(httprpc.server.Server):
-  METHODS = {
-    'test' : (TestMessage, TestMessage)
-  }
-  def test(self, req):
-    log.info('Server called: %s', req)
-    return req
+  def test_inner(self, v):
+    class Inner(object):
+      def foo(self):
+        return v
+
+      def bar(self):
+        return 2 * v
+
+    return Inner()
+
+  def test_exception(self):
+    raise Exception, 'Bob'
 
 class RPCTestCase(unittest.TestCase):
   def setUp(self):
     self.port = httprpc.common.find_open_port()
-    self._server = MockServer(host = 'localhost', port = self.port)
+    self._server = httprpc.server.Server(host = 'localhost', port = self.port)
+    self._server.register_object('mock', MockObject())
     self._server.start()
 
     self.c = httprpc.client.Client('localhost', self.port)
@@ -32,29 +36,33 @@ class RPCTestCase(unittest.TestCase):
   def tearDown(self):
     self._server.stop()
 
-  def test_simple_server(self):
-    req = TestMessage(str = 'Hi there!')
-    log.info('Response: %s', self.c.test(req))
+  def test_echo(self):
+    self.assertEqual(self.c.mock.test_echo('Hi!'), 'Hi!')
+    for i in range(10):
+      self.assertEqual(self.c.mock.test_echo(i), i)
+
+  def test_rmi(self):
+    inner = self.c.mock.test_inner(10)
+    self.assert_(inner)
+    self.assertEqual(inner.foo(), 10)
+    self.assertEqual(inner.bar(), 20)
+
+  def test_exception(self):
+    try:
+      self.c.mock.test_exception()
+    except Exception, e:
+      logging.info('Exception caught! %s', e)
+    else:
+      assert False
 
   def test_connections(self):
     gp = greenpool.GreenPool(size = 1000)
 
-    threads = [gp.spawn(self.c.test,
-                        TestMessage(str = 'Testing %d' % i,
-                                     int = i)) for i in range(50)]
+    threads = [gp.spawn(self.c.mock.test_echo, 'Test%d' % i) for i in range(50)]
 
     for i, t in enumerate(threads):
-      assert t.wait().int == i
+      assert t.wait() == 'Test%d' % i
 
-  def test_local(self):
-    gp = greenpool.GreenPool(size = 1000)
-
-    threads = [gp.spawn(self._server.test,
-                        TestMessage(str = 'Testing %d' % i,
-                                     int = i)) for i in range(500)]
-
-    for i, t in enumerate(threads):
-      assert t.wait().int == i
 
 if __name__ == '__main__':
   httprpc.common.enable_debugging()

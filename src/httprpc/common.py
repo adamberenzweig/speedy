@@ -1,35 +1,10 @@
 from eventlet.green import socket
-from httprpc.proto import Message, Field
-from httprpc import log
 import eventlet.debug
-
-class RPCHeader(Message):
-  FIELDS = {
-    'id' : Field.Int(),
-    'method' : Field.String(),
-    'request_size' : Field.Int(),
-  }
-
-class ServerErrorResponse(Message):
-  FIELDS = {
-    'exception' : Field.String(),
-    'message' : Field.String(),
-    'traceback' : Field.String()
-  }
-
-class RPCError(Exception):
-  pass
-
-class ConnectionLost(RPCError):
-  pass
-
-class ServerError(RPCError):
-  pass
-
+import logging
 
 def dump_eventlet():
-  log.warn('Listeners:\n %s', eventlet.debug.format_hub_listeners())
-  log.warn('Timers:\n %s', eventlet.debug.format_hub_timers())
+  logging.warn('Listeners:\n %s', eventlet.debug.format_hub_listeners())
+  logging.warn('Timers:\n %s', eventlet.debug.format_hub_timers())
 
 def enable_debugging():
   eventlet.debug.hub_listener_stacks(True)
