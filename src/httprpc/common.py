@@ -2,6 +2,11 @@ from eventlet.green import socket
 import eventlet.debug
 import logging
 
+class Message(object):
+  def __init__(self, **kw):
+    for k, v in kw.iteritems():
+      setattr(self, k, v)
+
 def dump_eventlet():
   logging.warn('Listeners:\n %s', eventlet.debug.format_hub_listeners())
   logging.warn('Timers:\n %s', eventlet.debug.format_hub_timers())

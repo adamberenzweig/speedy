@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from httprpc.common import Message
 from eventlet.green import httplib
 import types
 import yaml
@@ -11,11 +12,6 @@ def load(data):
 def store(obj):
   '''Takes as input an object and returns a serialized string representation.'''
   return yaml.dump(obj)
-
-class Message(object):
-  def __init__(self, **kw):
-    for k, v in kw.iteritems():
-      setattr(self, k, v)
 
 class ExceptionInfo(Message):
   exception = None
