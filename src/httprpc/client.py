@@ -14,10 +14,8 @@ class Client(object):
   def __repr__(self):
     return 'Client(%s, %d)'
 
-  def __getattr__(self, k):
-    if not k in self.__dict__:
-      return RemoteObjectProxy(internal.Channel(self._host, self._port), k)
-    raise KeyError
+  def object(self, name):
+    return RemoteObjectProxy(internal.Channel(self._host, self._port), name)
 
 
 class CallStub(object):
@@ -29,13 +27,12 @@ class CallStub(object):
   def __call__(self, *args, **kw):
 #    logging.info('Calling %s %s %s %s', self._objectid, self._method, args, kw)
     req = internal.ServerRequest(
-      method = self._method,
-      args = [internal.store(arg) for arg in args],
-      kw = dict([(k, internal.store(v)) for (k, v) in kw]))
+      method=self._method,
+      args=[internal.store(arg) for arg in args],
+      kw=dict([(k, internal.store(v)) for (k, v) in kw.items()]))
 
     path = '/rpc/invoke/%s' % self._objectid
-    self._channel.request('POST', path, internal.store(req))
-    resp = self._channel.getresponse()
+    resp = self._channel.get(path, internal.store(req))
     if resp.status != 200:
       raise internal.ServerError, 'Error connecting to %s%s -- %d' % (
         self._channel, path, resp.status)
@@ -63,6 +60,11 @@ class RemoteObjectProxy(object):
   def __init__(self, channel, objectid):
     self._channel = channel
     self._objectid = objectid
+
+  def __repr__(self):
+    return 'Proxy(%s:%s, %s)' % (self._channel.host,
+                                 self._channel.port,
+                                 self._objectid)
 
   def __getattr__(self, k):
     return CallStub(self._channel, self._objectid, k)
