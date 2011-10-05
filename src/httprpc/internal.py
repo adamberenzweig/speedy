@@ -32,16 +32,21 @@ PRIMITIVES = set(
     types.FloatType,
     types.BooleanType,
     types.StringType,
-    types.NoneType ])
+    types.NoneType, ])
 
 def is_primitive(obj):
   if type(obj) in PRIMITIVES:
     return True
+
+  if isinstance(obj, Message):
+    return True
+
   if isinstance(obj, types.ListType):
     for v in obj:
       if not is_primitive(v):
         return False
     return True
+
   if isinstance(obj, types.DictType):
     for k, v in obj.iteritems():
       if not is_primitive(k) or not is_primitive(v):
@@ -58,6 +63,15 @@ class ConnectionLost(RPCError):
 class ServerError(RPCError):
   pass
 
-class Channel(httplib.HTTPConnection):
+class Channel(object):
+  def __init__(self, host, port):
+    self.host = host
+    self.port = port
+
+  def get(self, path, data):
+    http = httplib.HTTPConnection(self.host, self.port)
+    http.request('POST', path, data)
+    return http.getresponse()
+
   def __repr__(self):
     return 'HTTP(%s:%s)' % (self.host, self.port)

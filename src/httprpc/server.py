@@ -25,13 +25,13 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def log_message(self, fmt, *args):
     logging.info('[%s] -- %s', self.address_string(), fmt % args)
 
-  def reply(self, code, data = ''):
+  def reply(self, code, data=''):
     self.send_response(code)
     self.send_header('content-length', len(data))
     self.end_headers()
     self.wfile.write(data)
 
-  def process_request(self, data = None):
+  def process_request(self, data=None):
     handler = self.server.handler_for_path(self.path)
     if not handler:
       self.reply(404, '')
@@ -45,7 +45,7 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def do_POST(self):
     self.process_request(
-      data = self.rfile.read(int(self.headers.getheader('content-length'))))
+      data=self.rfile.read(int(self.headers.getheader('content-length'))))
 
   def do_GET(self):
     self.process_request()
@@ -62,22 +62,26 @@ class ObjectRMI(object):
       req = internal.load(data)
       method = req.method
       args = tuple([internal.load(arg) for arg in req.args])
-      kw = dict([(k, internal.load(v)) for (k, v) in req.kw])
+      kw = dict([(k, internal.load(v)) for (k, v) in req.kw.items()])
 
       local_resp = getattr(self._object, method)(*args, **kw)
+      if local_resp is None:
+        logging.warning('RMI call %s.%s returned no result.',
+                        self._object.__class__.__name__, method)
+
       if internal.is_primitive(local_resp):
-        resp = internal.ServerResponse(data = local_resp)
+        resp = internal.ServerResponse(data=local_resp)
       else:
         objid = 'anonid:%s' % id(local_resp)
         self._server.register_object(objid, local_resp)
-        resp = internal.ServerResponse(objectid = objid)
+        resp = internal.ServerResponse(objectid=objid)
     except Exception:
       exc, message, _ = sys.exc_info()
       resp = internal.ServerResponse(
-        exc_info = internal.ExceptionInfo(
-          exception = str(exc),
-          message = str(message),
-          traceback = traceback.format_exc()))
+        exc_info=internal.ExceptionInfo(
+          exception=str(exc),
+          message=str(message),
+          traceback=traceback.format_exc()))
     finally:
       return internal.store(resp)
 
@@ -91,17 +95,18 @@ try:
       self._dict = template_vars
 
     def run(self, path, headers, data):
-      lookup = mako.lookup.TemplateLookup(directories = '')
-      template = mako.template.Template(filename = self._tfile, lookup = lookup)
+      lookup = mako.lookup.TemplateLookup(directories='')
+      template = mako.template.Template(filename=self._tfile, lookup=lookup)
       return template.render(**self._dict)
 except:
   MakoRequestHandler = None
 
 
-
-
 class Server(object):
-  def __init__(self, host = '0.0.0.0', port = None):
+  def __init__(self,
+               host='0.0.0.0',
+               port=None,
+               objects=None):
     assert(port != None)
 
     self._addr = (host, port)
@@ -110,21 +115,25 @@ class Server(object):
     self._pool = greenpool.GreenPool(10000)
     self._handlers = {}
 
+    if objects:
+      for name, obj in objects.items():
+        self.register_object(name, obj)
+
     self.register('/rpc/invoke/self', ObjectRMI(self, self))
 
   def register_object(self, name, obj):
     self.register('/rpc/invoke/%s' % name, ObjectRMI(self, obj))
 
   def register(self, path, handler):
-    logging.info('Registering handler for %s', path)
-    assert not self._handlers.has_key(path)
-    self._handlers[path] = handler
+    if not self._handlers.has_key(path):
+      logging.info('Registering handler for %s', path)
+      self._handlers[path] = handler
 
   def host(self): return self._addr[0]
   def port(self): return self._addr[1]
 
   def listen(self):
-    self._socket = eventlet.listen(self._addr, backlog = 1000)
+    self._socket = eventlet.listen(self._addr, backlog=1000)
 
   def handler_for_path(self, path):
     return self._handlers.get(path, None)
