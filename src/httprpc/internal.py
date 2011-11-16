@@ -1,21 +1,19 @@
 #!/usr/bin/env python
 
-from httprpc.common import Message
 from eventlet.green import httplib
+from httprpc.common import Message
+import logging
 import types
 import yaml
 
 def load(data):
   '''Takes as input a string and returns a deserialized output object'''
+  #logging.info('Loading: "%s"', data)
   return yaml.load(data)
 
-def store(obj):
+def store(message):
   '''Takes as input an object and returns a serialized string representation.'''
-  return yaml.dump(obj)
-
-class ExceptionInfo(Message):
-  exception = None
-  traceback = None
+  return yaml.dump(message)
 
 class ServerRequest(Message):
   method = None
@@ -25,10 +23,12 @@ class ServerRequest(Message):
 class ServerResponse(Message):
   objectid = None
   data = None
-  exc_info = None
+  exception = None
+  traceback = None
 
 PRIMITIVES = set(
   [ types.IntType,
+    types.CodeType,
     types.FloatType,
     types.BooleanType,
     types.StringType,

@@ -1,6 +1,7 @@
 from eventlet.green import socket
 import eventlet.debug
 import logging
+import yaml
 
 class Message(object):
   '''A simple helper class to build POD type objects.
@@ -11,8 +12,13 @@ class Message(object):
       setattr(self, k, v)
 
   def __repr__(self):
-    kv = [(k, getattr(self, k)) for k in self.__dict__ if k[0] != '_']
-    return ','.join(['%s : %s' % (k, v) for (k, v) in kv])
+    return '%s(\n%s)' % (
+      self.__class__.__name__,
+      ',\n'.join(['%s : %s' % (k, v)
+                  for (k, v) in self.as_dict().items()]))
+
+  def as_dict(self):
+    return dict((k, v) for k, v in self.__dict__.iteritems() if k[0] != '_')
 
 def dump_eventlet():
   logging.warn('Listeners:\n %s', eventlet.debug.format_hub_listeners())

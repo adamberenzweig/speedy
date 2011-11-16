@@ -14,7 +14,10 @@ class Client(object):
   def __repr__(self):
     return 'Client(%s, %d)'
 
-  def object(self, name):
+  def __getattr__(self, key):
+    return self.get_object(key)
+
+  def get_object(self, name):
     return RemoteObjectProxy(internal.Channel(self._host, self._port), name)
 
 
@@ -26,10 +29,7 @@ class CallStub(object):
 
   def __call__(self, *args, **kw):
 #    logging.info('Calling %s %s %s %s', self._objectid, self._method, args, kw)
-    req = internal.ServerRequest(
-      method=self._method,
-      args=[internal.store(arg) for arg in args],
-      kw=dict([(k, internal.store(v)) for (k, v) in kw.items()]))
+    req = internal.ServerRequest(method=self._method, args=args, kw=kw)
 
     path = '/rpc/invoke/%s' % self._objectid
     resp = self._channel.get(path, internal.store(req))
@@ -42,13 +42,13 @@ class CallStub(object):
 
 #    logging.info('Response: %s', resp_data)
 
-    assert isinstance(message, internal.ServerResponse)
+    assert isinstance(message, internal.ServerResponse), \
+      'Unexpected response: %s' % message
 
     # the server returned an exception to us; reraise it
-    if message.exc_info is not None:
-      exc_info = message.exc_info
+    if message.exception is not None:
       tb = '\n' + '\n'.join(['%s -- %s' % (self._channel, line)
-                             for line in exc_info.traceback.split('\n')])
+                             for line in message.traceback.split('\n')])
 
       raise internal.ServerError, tb
     elif message.objectid:

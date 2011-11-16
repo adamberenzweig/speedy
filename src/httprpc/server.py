@@ -40,6 +40,7 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     try:
       self.reply(200, handler.run(self.path, self.headers, data))
     except:
+      logging.error('Caught unexpected error on server.', exc_info=1)
       self.reply(500, '')
 
 
@@ -61,8 +62,8 @@ class ObjectRMI(object):
     try:
       req = internal.load(data)
       method = req.method
-      args = tuple([internal.load(arg) for arg in req.args])
-      kw = dict([(k, internal.load(v)) for (k, v) in req.kw.items()])
+      args = req.args
+      kw = req.kw
 
       local_resp = getattr(self._object, method)(*args, **kw)
       if local_resp is None:
@@ -75,13 +76,12 @@ class ObjectRMI(object):
         objid = 'anonid:%s' % id(local_resp)
         self._server.register_object(objid, local_resp)
         resp = internal.ServerResponse(objectid=objid)
-    except Exception:
+    except:
       exc, message, _ = sys.exc_info()
       resp = internal.ServerResponse(
-        exc_info=internal.ExceptionInfo(
           exception=str(exc),
           message=str(message),
-          traceback=traceback.format_exc()))
+          traceback=traceback.format_exc())
     finally:
       return internal.store(resp)
 
