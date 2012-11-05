@@ -5,13 +5,13 @@ README = open(os.path.abspath(os.path.dirname(__file__)) + '/README').read()
 
 from setuptools import setup, find_packages, Command
 setup(
-    name = "jsonrpc",
-    description="HTTP/JSON based RPC system.",
+    name = "speedy",
+    description="Fast, non-blocking JSON based RPC system.",
     version = "0.1",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
-    url="http://github.com/rjpower/jsonrpc",
+    url="http://github.com/rjpower/speedy",
     data_files = [('.', ['README'])],
     package_dir = { '' : 'src' },
     packages = ['rpc'],
