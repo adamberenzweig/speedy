@@ -7,16 +7,17 @@ A fast non-blocking JSON based RPC library for Python.
 Usage
 -----
 
-Server:
-    class MyHandler(object):
-      def foo(self, handle, arg1, arg2):
-        handle.done(do_something(arg1, arg2))
+##### Server
     
+    class MyHandler(object):
+        def foo(self, handle, arg1, arg2):
+            handle.done(do_something(arg1, arg2))
+
     import rpc.server
     s = rpc.server.RPCServer('localhost', 9999, handler=MyHandler())
     s.start()
 
-Client:
+##### Client
 
     import rpc.client
     c = rpc.client.RPCClient('localhost', 9999)
