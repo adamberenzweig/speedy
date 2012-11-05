@@ -1,16 +1,43 @@
 #!/usr/bin/env python
 
-from distribute_setup import use_setuptools
-use_setuptools()
+import os.path
+README = open(os.path.abspath(os.path.dirname(__file__)) + '/README').read()
 
 from setuptools import setup, find_packages, Command
 setup(
-    name = "http-rpc",
+    name = "jsonrpc",
+    description="HTTP/JSON based RPC system.",
     version = "0.1",
+    author="Russell Power",
+    author_email="power@cs.nyu.edu",
+    license="BSD",
+    url="http://github.com/rjpower/jsonrpc",
+    data_files = [('.', ['README'])],
     package_dir = { '' : 'src' },
-    packages = ['httprpc'],
-    install_requires = [
-      'distribute>=0.6.19',
-      'eventlet>=0.9.16'
-    ]
+    packages = ['rpc'],
+    requires = [
+      'PyYAML',
+      'jsonpickle',
+    ],
+    install_requires = [ 
+      'PyYAML',  
+      'jsonpickle',
+    ],
+    long_description=README,
+    classifiers=['Development Status :: 3 - Alpha',
+                 'Topic :: Software Development :: Libraries',
+                 'Topic :: System :: Clustering',
+                 'Topic :: System :: Distributed Computing',
+                 'License :: OSI Approved :: BSD License',
+                 'Intended Audience :: Developers',
+                 'Intended Audience :: System Administrators',
+                 'Operating System :: POSIX',
+                 'Programming Language :: Python :: 2.5',
+                 'Programming Language :: Python :: 2.6',
+                 'Programming Language :: Python :: 2.7',
+                 'Programming Language :: Python :: 3',
+                 'Programming Language :: Python :: 3.0',
+                 'Programming Language :: Python :: 3.1',
+                 'Programming Language :: Python :: 3.2',
+                 ],
 )

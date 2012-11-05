@@ -1,7 +1,14 @@
-from eventlet.green import socket
-import eventlet.debug
-import logging
+import jsonpickle
+import socket
 import yaml
+import traceback
+
+
+class RemoteException(object):
+  def __init__(self, exc_info):
+    self.exception = exc_info[1]
+    tb  = '\n'.join(traceback.format_exception(*exc_info))
+    self.formatted_tb = tb.replace('\n', '\n>>')
 
 class Message(object):
   '''A simple helper class to build POD type objects.
@@ -20,17 +27,6 @@ class Message(object):
   def as_dict(self):
     return dict((k, v) for k, v in self.__dict__.iteritems() if k[0] != '_')
 
-def dump_eventlet():
-  logging.warn('Listeners:\n %s', eventlet.debug.format_hub_listeners())
-  logging.warn('Timers:\n %s', eventlet.debug.format_hub_timers())
-
-def enable_debugging():
-  eventlet.debug.hub_listener_stacks(True)
-  eventlet.debug.hub_timer_stacks(True)
-
-  import atexit
-  atexit.register(dump_eventlet)
-
 def find_open_port():
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.bind(("", 0))
@@ -42,3 +38,10 @@ def find_open_port():
 def split_addr(hostport):
   host, port = hostport.split(':')
   return host, int(port)
+
+
+def pickle(v):
+  return jsonpickle.encode(v)
+
+def unpickle(str):
+  return jsonpickle.decode(str)

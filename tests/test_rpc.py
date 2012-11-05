@@ -1,69 +1,64 @@
 #!/usr/bin/env python
 
-from eventlet import greenpool
-import httprpc.client
-import httprpc.common
-import httprpc.server
+import rpc.client
+import rpc.common
+import rpc.server
 import logging
 import unittest
+import threading
 
-class MockObject(object):
-  def test_echo(self, v):
-    return v
+logging.basicConfig(format='%(asctime)s %(filename)s:%(funcName)s %(message)s',
+                    level=logging.INFO)
 
-  def test_inner(self, v):
-    class Inner(object):
-      def foo(self):
-        return v
 
-      def bar(self):
-        return 2 * v
+class TestHandler(object):
+  def test_echo(self, handle, v):
+    handle.done(v)
 
-    return Inner()
-
-  def test_exception(self):
+  def test_exception(self, handle):
     raise Exception, 'Bob'
 
 class RPCTestCase(unittest.TestCase):
   def setUp(self):
-    self.port = httprpc.common.find_open_port()
-    self._server = httprpc.server.Server(host = 'localhost', port = self.port)
-    self._server.register_object('mock', MockObject())
+    self.port = rpc.common.find_open_port()
+    mock = TestHandler()
+    self._server = rpc.server.RPCServer(host='localhost', port=self.port, handler=mock)
     self._server.start()
-
-    self.c = httprpc.client.Client('localhost', self.port)
+    self.c = rpc.client.RPCClient('localhost', self.port)
 
   def tearDown(self):
     self._server.stop()
 
   def test_echo(self):
-    self.assertEqual(self.c.mock.test_echo('Hi!'), 'Hi!')
+    self.assertEqual(self.c.test_echo('Hi!').wait(), 'Hi!')
     for i in range(10):
-      self.assertEqual(self.c.mock.test_echo(i), i)
-
-  def test_rmi(self):
-    inner = self.c.mock.test_inner(10)
-    self.assert_(inner)
-    self.assertEqual(inner.foo(), 10)
-    self.assertEqual(inner.bar(), 20)
-
+      self.assertEqual(self.c.test_echo(i).wait(), i)
+  
   def test_exception(self):
     try:
-      self.c.mock.test_exception()
+      self.c.test_exception().wait()
     except Exception, e:
       logging.info('Exception caught! %s', e)
     else:
       assert False
 
   def test_connections(self):
-    gp = greenpool.GreenPool(size = 1000)
-
-    threads = [gp.spawn(self.c.mock.test_echo, 'Test%d' % i) for i in range(50)]
+    class ResultTester(threading.Thread):
+      def __init__(self, client, v):
+        threading.Thread.__init__(self)
+        self.v = v
+        self.client = client
+        self.result = None
+      
+      def run(self):
+        self.result = self.client.test_echo('Test%d' % self.v)
+        
+    threads = [ResultTester(self.c, i) for i in range(50)]
+    [t.start() for t in threads]
 
     for i, t in enumerate(threads):
-      assert t.wait() == 'Test%d' % i
-
+      t.join()
+      assert t.result == 'Test%d' % i
 
 if __name__ == '__main__':
-  httprpc.common.enable_debugging()
   unittest.main()
