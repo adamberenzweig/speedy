@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
 import os.path
-README = open(os.path.abspath(os.path.dirname(__file__)) + '/README').read()
+README = open(os.path.abspath(os.path.dirname(__file__)) + '/README.md').read()
 
 from setuptools import setup, find_packages, Command
 setup(
     name = "speedy",
     description="Fast, non-blocking JSON based RPC system.",
-    version = "0.1",
+    version = "0.11",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
     url="http://github.com/rjpower/speedy",
-    data_files = [('.', ['README'])],
+    data_files = [('.', ['README.md'])],
     package_dir = { '' : 'src' },
     packages = ['rpc'],
     requires = [
