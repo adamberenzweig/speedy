@@ -42,6 +42,10 @@ class RPCTestCase(unittest.TestCase):
     else:
       assert False
 
+  def test_crazy_string(self):
+    s = ''.join([chr(i) for i in range(200)])
+    self.assertEqual(self.c.test_echo(s).wait(), s)
+
   def test_connections(self):
     class ResultTester(threading.Thread):
       def __init__(self, client, v):

@@ -1,6 +1,7 @@
 import jsonpickle
 import socket
 import traceback
+import yaml
 
 class RemoteException(object):
   def __init__(self, exc_info):
@@ -39,7 +40,7 @@ def split_addr(hostport):
 
 
 def pickle(v):
-  return jsonpickle.encode(v)
+  return yaml.dump(v)
 
 def unpickle(str):
-  return jsonpickle.decode(str)
+  return yaml.load(str)

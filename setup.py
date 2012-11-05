@@ -4,14 +4,14 @@ from setuptools import setup, find_packages, Command
 setup(
     name = "speedy",
     description="Fast, non-blocking JSON based RPC system.",
-    version = "0.13",
+    version = "0.15",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
     url="http://github.com/rjpower/speedy",
     package_dir = { '' : 'src' },
     packages = ['rpc'],
-    install_requires = [ 'jsonpickle', ],
+    install_requires = [ 'PyYAML', 'jsonpickle', ],
     long_description='''
 Speedy - A Fast RPC System for Python
 =====================================
