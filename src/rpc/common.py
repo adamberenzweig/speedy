@@ -1,8 +1,6 @@
 import jsonpickle
 import socket
-import yaml
 import traceback
-
 
 class RemoteException(object):
   def __init__(self, exc_info):

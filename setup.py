@@ -9,17 +9,9 @@ setup(
     author_email="power@cs.nyu.edu",
     license="BSD",
     url="http://github.com/rjpower/speedy",
-    data_files = [('.', ['README.md'])],
     package_dir = { '' : 'src' },
     packages = ['rpc'],
-    requires = [
-      'PyYAML',
-      'jsonpickle',
-    ],
-    install_requires = [ 
-      'PyYAML',  
-      'jsonpickle',
-    ],
+    install_requires = [ 'jsonpickle', ],
     long_description='''
 Speedy - A Fast RPC System for Python
 =====================================
