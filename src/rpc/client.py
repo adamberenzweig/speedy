@@ -4,6 +4,7 @@ from rpc.connection import BufferedConnection
 import logging
 import socket
 import time
+import threading
 import types
 import traceback
 
@@ -14,7 +15,6 @@ class ClientHandle(object):
   SENT = 1
   SUCCESS = 2
   TIMED_OUT = 3
-  ERROR = 4
 
   def done(self):
     return self.state >= ClientHandle.SUCCESS
@@ -28,7 +28,7 @@ class ClientHandle(object):
     self.result = None
     self.error = None
     self.deadline = self.start_time + deadline
-#    self.finished = threading.Condition()
+    self.finished_cv = threading.Condition()
 
   def __repr__(self):
     return 'ClientHandle(rpc=%d, state=%d)' % (self.rpcid, self.state)
@@ -60,15 +60,14 @@ class ClientConnection(BufferedConnection):
       if not handle:
         logging.info('Dropping response to stale handle %s', rpcid)
       else:
-        handle.server_elapsed = server_elapsed
-        handle.result = result
-        handle.error = error
-        handle.state = ClientHandle.SUCCESS
-        handle.end_time = time.time()
-        self.invoke_callback(rpcid, handle)
-
-#      with handle.finished:
-#        handle.finished.notify_all()
+        with handle.finished_cv:
+          handle.server_elapsed = server_elapsed
+          handle.result = result
+          handle.error = error
+          handle.state = ClientHandle.SUCCESS
+          handle.end_time = time.time()
+          self.invoke_callback(rpcid, handle)
+          handle.finished_cv.notify_all()
 
   def invoke_callback(self, rpcid, handle):
     if rpcid in self._callbacks:
@@ -99,18 +98,16 @@ class ClientConnection(BufferedConnection):
       raise RPCError, 'Tried to wait_for_response on a non-existing message.'
 
     handle = self.pending_rpcs[rpcid]
-    while not handle.done():
-      if time.time() > handle.deadline:
-        logging.warn('RPC %s (client %s, server %s:%d) timed out.',
-                     handle.rpcid, socket.gethostname(), self.host, self.port)
-        handle.state = ClientHandle.TIMED_OUT
-        handle.end_time = time.time()
+    with handle.finished_cv:
+      if not handle.done():
+        handle.finished_cv.wait(handle.deadline)
 
-      time.sleep(0.001)
-#      logging.info('Waiting... %s', self.pending_rpcs.items()[:10])
-#      with handle.finished:
-#        handle.finished.wait()
-
+    if not handle.done():
+      logging.warn('RPC %s (client %s, server %s:%d) timed out.',
+                   handle.rpcid, socket.gethostname(), self.host, self.port)
+      handle.state = ClientHandle.TIMED_OUT
+      handle.end_time = time.time()
+    
     del self.pending_rpcs[rpcid]
 
     if handle.error is not None:

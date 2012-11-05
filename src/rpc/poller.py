@@ -58,7 +58,7 @@ class EPollWorker(object):
   def _poll_loop(self):
     while self._running:
 #      logging.debug('Polling %d objects...', len(self._sockets))
-      events = self._epoll.poll(0.001)
+      events = self._epoll.poll(0.1)
 
       for fd, ev in events:
         try:
