@@ -3,6 +3,14 @@ Speedy - A Fast RPC System for Python
 
 A fast non-blocking JSON based RPC library for Python.
 
+Installation
+------------
+
+    pip install [--user] speedy
+
+or
+
+    easy_install speedy
 
 Usage
 -----
