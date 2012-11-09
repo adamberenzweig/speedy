@@ -58,7 +58,7 @@ class RPCServer(threading.Thread):
     self._listen_socket.settimeout(None)
     self._listen_socket.bind((host, port))
 
-    self._poller = EPollWorker('ServerPollWorker')
+    self._poller = EPollWorker('Poll.%s.%d' % (handler.__class__.__name__, port))
 
   def num_pending_rpcs(self):
     return len(self._pending_rpcs)
