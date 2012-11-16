@@ -25,8 +25,6 @@ class EPollWorker(object):
     fl = fcntl.fcntl(self._wake_pipe_r, fcntl.F_GETFL)
     fcntl.fcntl(self._wake_pipe_r, fcntl.F_SETFL, fl | os.O_NONBLOCK)
     
-    self._awake = False
-
     self._epoll.register(self._wake_pipe_r)
     self._thread = threading.Thread(name = name, target = self.run)
     self._thread.setDaemon(True)
@@ -55,8 +53,7 @@ class EPollWorker(object):
       del self._sockets[fd]
 
   def wakeup(self):
-    if not self._awake:
-      os.write(self._wake_pipe_w, '*')
+    os.write(self._wake_pipe_w, '*')
 
   def run(self):
     while self._running:
@@ -74,9 +71,7 @@ class EPollWorker(object):
   def _poll_loop(self):
     while self._running:
 #      logging.debug('Polling %d objects...', len(self._sockets))  
-      self._awake = False 
       events = self._epoll.poll(0.1)
-      self._awake = True
 
       for fd, ev in events:
         try:

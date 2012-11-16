@@ -75,6 +75,6 @@ class RPCTestCase(unittest.TestCase):
       assert t.result == 'Test%d' % i
 
 if __name__ == '__main__':
-  unittest.run()
+  unittest.main()
 #  import cProfile
 #  cProfile.run('unittest.main()', 'profile.out')

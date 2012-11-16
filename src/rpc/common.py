@@ -1,7 +1,5 @@
-import jsonpickle
 import socket
 import traceback
-import yaml
 import cPickle
 
 class RemoteException(object):
