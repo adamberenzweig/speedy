@@ -1,6 +1,8 @@
 from rpc import SocketError
 from select import EPOLLIN, EPOLLOUT, EPOLLERR
+import fcntl
 import logging
+import os
 import select
 import socket
 import sys
@@ -18,6 +20,14 @@ class EPollWorker(object):
     self._lock = threading.Lock()
     self._pending = []
     self._sockets = {}
+
+    self._wake_pipe_r, self._wake_pipe_w = os.pipe()
+    fl = fcntl.fcntl(self._wake_pipe_r, fcntl.F_GETFL)
+    fcntl.fcntl(self._wake_pipe_r, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    
+    self._awake = False
+
+    self._epoll.register(self._wake_pipe_r)
     self._thread = threading.Thread(name = name, target = self.run)
     self._thread.setDaemon(True)
     self._thread.start()
@@ -32,6 +42,7 @@ class EPollWorker(object):
   def register(self, conn):
     with self._lock:
       logging.debug('Registering %s (%d)', self.name, conn.fileno())
+      conn.poller = self
       self._pending.append(conn)
 
   def unregister(self, fd):
@@ -39,8 +50,13 @@ class EPollWorker(object):
       logging.debug('Dropping %s (%d)', self.name, fd)
       self._epoll.unregister(fd)
       socket = self._sockets[fd]
+      socket.poller = None
       socket.close()
       del self._sockets[fd]
+
+  def wakeup(self):
+    if not self._awake:
+      os.write(self._wake_pipe_w, '*')
 
   def run(self):
     while self._running:
@@ -57,11 +73,17 @@ class EPollWorker(object):
 
   def _poll_loop(self):
     while self._running:
-#      logging.debug('Polling %d objects...', len(self._sockets))
+#      logging.debug('Polling %d objects...', len(self._sockets))  
+      self._awake = False 
       events = self._epoll.poll(0.1)
+      self._awake = True
 
       for fd, ev in events:
         try:
+          if fd == self._wake_pipe_r:
+            os.read(self._wake_pipe_r, 1000000)
+            continue
+
           conn = self._sockets[fd]
           if ev & EPOLLIN:
 #            logging.info('Reading...')
@@ -87,3 +109,4 @@ class EPollWorker(object):
             self._sockets[conn.fileno()] = conn
 
         self._pending = []
+      

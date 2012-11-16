@@ -116,7 +116,7 @@ class RPCServer(threading.Thread):
     try:
       getattr(self.handler, handle.method)(handle, *handle.args)
     except:
-      logging.warn('Exception while handling method: %s', handle.method, exc_info = 1)
+      logging.warn('Exception while handling method: %s', handle.method, exc_info=1)
       handle.done(RemoteException(sys.exc_info()))
 #    logging.debug('Dispatch finished.')
 

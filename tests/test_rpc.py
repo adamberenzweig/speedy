@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
+import logging
 import rpc.client
 import rpc.common
 import rpc.server
-import logging
-import unittest
 import threading
+import unittest
 
 logging.basicConfig(format='%(asctime)s %(filename)s:%(funcName)s %(message)s',
                     level=logging.INFO)
@@ -45,6 +45,16 @@ class RPCTestCase(unittest.TestCase):
   def test_crazy_string(self):
     s = ''.join([chr(i) for i in range(200)])
     self.assertEqual(self.c.test_echo(s).wait(), s)
+    
+  def test_many(self):
+    handles = []
+    for i in range(10000):
+      if i % 1000 == 0: print i
+      handles.append(self.c.test_echo('aaa'))
+    
+    for i, h in enumerate(handles):
+      if i % 1000 == 0: print i
+      h.wait()
 
   def test_connections(self):
     class ResultTester(threading.Thread):
@@ -65,4 +75,6 @@ class RPCTestCase(unittest.TestCase):
       assert t.result == 'Test%d' % i
 
 if __name__ == '__main__':
-  unittest.main()
+  unittest.run()
+#  import cProfile
+#  cProfile.run('unittest.main()', 'profile.out')

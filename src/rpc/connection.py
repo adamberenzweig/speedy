@@ -7,6 +7,7 @@ class BufferedConnection(object):
   def __init__(self, socket, addr):
     self.host = addr[0]
     self.port = addr[1]
+    self.poller = None
     self._socket = socket
     self._socket.setblocking(False)
     self._pending_writes = collections.deque()
@@ -36,6 +37,8 @@ class BufferedConnection(object):
   def push_message(self, rpc_id, message):
     header = struct.pack('II', len(message), rpc_id)
     self._pending_writes.append((rpc_id, header + message))
+    if self.poller:
+      self.poller.wakeup()
 
   def pop_message(self):
     return self._pending_reads.popleft()
