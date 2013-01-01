@@ -6,6 +6,7 @@ import select
 import socket
 import sys
 import threading
+import types
 import time
 
 SERVER_RPCID_GEN = iter(xrange(100000000))
@@ -97,8 +98,10 @@ class RPCServer(threading.Thread):
 #    logging.info('RPCFINISHED %d', server_rpcid)
     try:
       handle = self._pending_rpcs[server_rpcid]
-      logging.debug('Returning result for sid %d cid %d',
-                handle.server_rpcid, handle.client_rpcid)
+      logging.debug('Returning result for sid %d cid %d', handle.server_rpcid, handle.client_rpcid)
+      if isinstance(result, tuple) and len(result) == 3 and isinstance(result[2], types.TracebackType):
+        result = RemoteException(result)
+
       message = pickle((result, handle.elapsed(), None))
       handle.connection.push_message(handle.client_rpcid, message)
       del self._pending_rpcs[server_rpcid]
@@ -113,10 +116,11 @@ class RPCServer(threading.Thread):
                   handle.server_rpcid, handle.client_rpcid)
     self._pending_rpcs[handle.server_rpcid] = handle
     handle.done = lambda *args: self.rpc_finished(handle.server_rpcid, *args)
+    handle.error = lambda exc_info: self.rpc_finished(handle.server_rpcid, RemoteException(exc_info))
     try:
       getattr(self.handler, handle.method)(handle, *handle.args)
     except:
       logging.warn('Exception while handling method: %s', handle.method, exc_info=1)
-      handle.done(RemoteException(sys.exc_info()))
+      handle.error(sys.exc_info())
 #    logging.debug('Dispatch finished.')
 

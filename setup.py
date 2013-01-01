@@ -4,7 +4,7 @@ from setuptools import setup, find_packages, Command
 setup(
     name = "speedy",
     description="Fast, non-blocking JSON based RPC system.",
-    version = "0.19",
+    version = "0.20",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
