@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import logging
-import rpc.client
-import rpc.common
-import rpc.server
+import speedy.client
+import speedy.common
+import speedy.server
 import threading
 import unittest
 
@@ -20,11 +20,11 @@ class TestHandler(object):
 
 class RPCTestCase(unittest.TestCase):
   def setUp(self):
-    self.port = rpc.common.find_open_port()
+    self.port = speedy.common.find_open_port()
     mock = TestHandler()
-    self._server = rpc.server.RPCServer(host='localhost', port=self.port, handler=mock)
+    self._server = speedy.server.RPCServer(host='localhost', port=self.port, handler=mock)
     self._server.start()
-    self.c = rpc.client.RPCClient('localhost', self.port)
+    self.c = speedy.client.RPCClient('localhost', self.port)
 
   def tearDown(self):
     self._server.stop()

@@ -1,6 +1,6 @@
-from rpc.common import pickle, unpickle, RemoteException
-from rpc.connection import BufferedConnection
-from rpc.poller import EPollWorker
+from speedy.common import pickle, unpickle, RemoteException
+from speedy.connection import BufferedConnection
+from speedy.poller import EPollWorker
 import logging
 import select
 import socket

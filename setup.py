@@ -10,7 +10,7 @@ setup(
     license="BSD",
     url="http://github.com/rjpower/speedy",
     package_dir = { '' : 'src' },
-    packages = ['rpc'],
+    packages = ['speedy'],
     install_requires = [],
     long_description='''
 Speedy - A Fast RPC System for Python

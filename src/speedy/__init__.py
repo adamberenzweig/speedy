@@ -6,7 +6,7 @@ class RPCError(Exception): pass
 
 _DefaultPoller = None
 def DefaultPoller():
-  from rpc import poller
+  from speedy import poller
   global _DefaultPoller
   if not _DefaultPoller:
     _DefaultPoller = poller.EPollWorker('ClientPollWorker')
@@ -14,14 +14,14 @@ def DefaultPoller():
 
 
 def ResetPoller():
-  from rpc import poller
+  from speedy import poller
   global _DefaultPoller
   _DefaultPoller = poller.EPollWorker('ClientPollWorker')
 
 
 CLIENT_CACHE = threading.local()
 def connect(host, port):
-  from rpc.client import RPCClient
+  from speedy.client import RPCClient
   if not hasattr(CLIENT_CACHE, 'connections'):
     CLIENT_CACHE.connections = {}
 

@@ -1,6 +1,6 @@
-from rpc import RPCError, DefaultPoller
-from rpc.common import pickle, unpickle, RemoteException
-from rpc.connection import BufferedConnection
+from speedy import RPCError, DefaultPoller
+from speedy.common import pickle, unpickle, RemoteException
+from speedy.connection import BufferedConnection
 import logging
 import socket
 import time

@@ -1,4 +1,4 @@
-from rpc import RPCError, SocketError
+from speedy import RPCError, SocketError
 import collections
 import logging
 import struct

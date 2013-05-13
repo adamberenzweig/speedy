@@ -1,4 +1,4 @@
-from rpc import SocketError
+from speedy import SocketError
 from select import EPOLLIN, EPOLLOUT, EPOLLERR
 import fcntl
 import logging
