@@ -1,7 +1,7 @@
 Speedy - A Fast RPC System for Python
 =====================================
 
-A fast non-blocking JSON based RPC library for Python.
+A fast non-blocking RPC library for Python.
 
 Installation
 ------------
