@@ -6,7 +6,7 @@ from Cython.Distutils import build_ext
 setup(
     name="speedy",
     description="Fast, non-blocking RPC system.",
-    version="0.20",
+    version="0.22",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
