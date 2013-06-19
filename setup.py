@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages, Command, Extension
-from Cython.Distutils import build_ext
+#from Cython.Distutils import build_ext
 
 setup(
     name="speedy",
     description="Fast, non-blocking RPC system.",
-    version="0.22",
+    version="0.23",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
     url="http://github.com/rjpower/speedy",
     package_dir={ 'speedy' : 'speedy' },
     packages=['speedy'],
-    install_requires=['pyzmq', 'numpy', 'cython'],
+    install_requires=['pyzmq'],
     long_description='''
 Speedy - A Fast RPC System for Python
 =====================================
@@ -65,8 +65,8 @@ Feedback
 Questions, comments: <power@cs.nyu.edu>
     ''',
 
-    cmdclass={'build_ext': build_ext},
-    ext_modules=[
-      Extension("speedy.core", ["speedy/core.pyx"])
-    ]
+#    cmdclass={'build_ext': build_ext},
+#    ext_modules=[
+#      Extension("speedy.core", ["speedy/core.pyx"])
+#   ]
 )

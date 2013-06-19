@@ -4,9 +4,9 @@ Simple RPC library.
 The :class:`.Client` and :class:`.Server` classes here work with
 sockets which should implement the :class:`.Socket` interface.
 '''
-from . import core, util
+from . import util
 import cPickle
-
+import cStringIO
 import sys
 import threading
 import time
@@ -66,7 +66,8 @@ class PendingRequest(object):
     self.finished = True
     header = { 'rpc_id' : self.rpc_id }
     # util.log('Finished %s, %s', self.socket.addr, self.rpc_id)
-    w = core.Writer()
+    #w = core.Writer()
+    w = cStringIO.StringIO()
     cPickle.dump(header, w, -1)
     cPickle.dump(result, w, -1)
     self.socket.send(w.getvalue())
@@ -193,7 +194,8 @@ class Server(object):
 
   def handle_read(self, socket):
     data = socket.recv()
-    reader = core.Reader(data)
+    #reader = core.Reader(data)
+    reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
 
     # util.log('Starting: %s %s', self._socket.addr, header['rpc_id'])
@@ -230,7 +232,8 @@ class ProxyMethod(object):
 
     f = Future(self.socket.addr, rpc_id)
     self.client._futures[rpc_id] = f
-    w = core.Writer()
+    #w = core.Writer()
+    w = cStringIO.StringIO()
     cPickle.dump(header, w, -1)
     cPickle.dump(request, w, -1)
 
@@ -265,8 +268,8 @@ class Client(object):
 
   def handle_read(self, socket):
     data = socket.recv()
-    import numpy as N
-    reader = core.Reader(N.frombuffer(data, dtype=N.uint8))
+    #reader = core.Reader(N.frombuffer(data, dtype=N.uint8))
+    reader = cStringIO.StringIO(data)
     header = cPickle.load(reader)
     resp = cPickle.load(reader)
     rpc_id = header['rpc_id']

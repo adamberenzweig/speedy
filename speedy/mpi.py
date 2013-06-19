@@ -3,7 +3,6 @@
 '''MPI "sockets"'''
 
 from mpi4py import MPI
-from sparrow.rpc.common import Group
 import collections
 
 import numpy as N

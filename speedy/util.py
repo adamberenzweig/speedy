@@ -178,59 +178,14 @@ def enable_stacktrace():
 def disable_stacktrace():
   signal.signal(signal.SIGQUIT, signal.SIG_DFL)
 
-_thread_run = Thread.run
-_stat_lock = threading.Lock()
-def _run_with_profile(self):
-  self._prof = cProfile.Profile()
-  self._prof.enable()
-  _thread_run(self)
-  self._prof.disable()
-
-  with _stat_lock:
-    if Thread.stats is None:
-      Thread.stats = pstats.Stats(self._prof)
-    else:
-      Thread.stats.add(self._prof)
-
 def dump_profile():
   import yappi
   yappi.stop()
   yappi.get_func_stats().save('/tmp/prof.out.%d' % os.getpid(), type='callgrind')
 
-  from sparrow.rpc import zeromq
-  zeromq.shutdown()
-  stats = get_profile()
-  if stats is None:
-    return
-  # stats.sort_stats('cumulative').print_stats(25)
-  stats.dump_stats('/tmp/prof.out.%d' % os.getpid())
-  try:
-    os.unlink('/tmp/prof.out')
-  except: pass
-
-  try:
-    os.symlink('/tmp/prof.out.%d' % os.getpid(), '/tmp/prof.out')
-  except:
-    pass
 
 PROFILER = None
 def enable_profiling():
   import yappi
   yappi.start()
   return
-
-  Thread.stats = None
-  Thread.run = _run_with_profile
-  global PROFILER
-  PROFILER = cProfile.Profile()
-  PROFILER.enable()
-  atexit.register(dump_profile)
-
-def get_profile():
-  if PROFILER is None:
-    return None
-
-  stats = pstats.Stats(PROFILER)
-  if threading.Thread.stats is not None:
-    stats.add(threading.Thread.stats)
-  return stats
