@@ -1,68 +1,72 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages, Command
+from setuptools import setup, find_packages, Command, Extension
+from Cython.Distutils import build_ext
+
 setup(
-    name = "speedy",
-    description="Fast, non-blocking JSON based RPC system.",
-    version = "0.20",
+    name="speedy",
+    description="Fast, non-blocking RPC system.",
+    version="0.20",
     author="Russell Power",
     author_email="power@cs.nyu.edu",
     license="BSD",
     url="http://github.com/rjpower/speedy",
-    package_dir = { '' : 'src' },
-    packages = ['speedy'],
-    install_requires = [],
+    package_dir={ 'speedy' : 'speedy' },
+    packages=['speedy'],
+    install_requires=['pyzmq', 'numpy', 'cython'],
     long_description='''
 Speedy - A Fast RPC System for Python
 =====================================
 
-A fast non-blocking JSON based RPC library for Python.
+A fast non-blocking RPC library for Python.
+
+Installation
+------------
+
+    pip install [--user] speedy
+
+or
+
+    easy_install speedy
 
 Usage
 -----
+##### Imports
 
-Server
-''''''
+    import speedy
+    from speedy import zeromq
 
-::
+##### Server
 
-    class MyHandler(object):
-        def foo(self, handle, arg1, arg2):
-            handle.done(do_something(arg1, arg2))
+    class MyServer(speedy.Server):
+        def foo(self, handle, request):
+            handle.done(do_something(request.foo, request.bar))
+    server = MyServer(zeromq.server_socket(('127.0.0.1', port)))
+    # or use -1 to have the server grab an open port
+    # server = MyServer(zeromq.server_socket(('127.0.0.1', -1)))
+    server.serve() # blocks until server exits
 
-    import speedy.server
-    s = speedy.server.RPCServer('localhost', 9999, handler=MyHandler())
-    s.start()
+##### Client
 
-Client
-''''''
+    client = speedy.Client(zeromq.client_socket(('127.0.0.1', server_port)))
 
-::
+    # requests are arbitrary python objects
+    request = { 'foo' : 123, 'bar' : 456 }
 
-    import speedy.client
-    c = speedy.client.RPCClient('localhost', 9999)
-    future = c.foo('Some data', 'would go here')
-    assert future.wait() == 'Expected result.'
+    future = client.foo(request)
+
+    # Wait for the result.   If the server encountered an error,
+    # an speedy.RemoteException will be thrown.
+    result = future.wait()
 
 Feedback
 --------
 
-Questions, comments: power@cs.nyu.edu
+Questions, comments: <power@cs.nyu.edu>
     ''',
-    classifiers=['Development Status :: 3 - Alpha',
-                 'Topic :: Software Development :: Libraries',
-                 'Topic :: System :: Clustering',
-                 'Topic :: System :: Distributed Computing',
-                 'License :: OSI Approved :: BSD License',
-                 'Intended Audience :: Developers',
-                 'Intended Audience :: System Administrators',
-                 'Operating System :: POSIX',
-                 'Programming Language :: Python :: 2.5',
-                 'Programming Language :: Python :: 2.6',
-                 'Programming Language :: Python :: 2.7',
-                 'Programming Language :: Python :: 3',
-                 'Programming Language :: Python :: 3.0',
-                 'Programming Language :: Python :: 3.1',
-                 'Programming Language :: Python :: 3.2',
-                 ],
+
+    cmdclass={'build_ext': build_ext},
+    ext_modules=[
+      Extension("speedy.core", ["speedy/core.pyx"])
+    ]
 )
