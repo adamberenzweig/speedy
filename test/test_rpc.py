@@ -44,7 +44,7 @@ class EchoWorker(speedy.Server):
     speedy.Server.__init__(self, *args, **kw)
 
   def ping(self, handle, req):
-    util.log_info('%s', req.ping)
+    #util.log_info('%s', req.ping)
     #time.sleep(0.01)
     handle.done(Pong(pong=req.ping))
 
@@ -54,6 +54,9 @@ class EchoWorker(speedy.Server):
 
   def ping_no_reply(self, handle, req):
     handle.done()
+
+  def bad_call(self, handle, req):
+    raise Exception, 'Bad!'
 
 class PingWorker(threading.Thread):
   def __init__(self, addr):
@@ -119,6 +122,23 @@ class RPCTest(unittest.TestCase):
         futures.append(proxy.thread_ping(ping_req))
       for i in range(100):
         futures[i].wait()
+  
+  def test_bad_throw(self):
+    speedy.config.throw_remote_exceptions = True
+    try:
+      with self._connect() as proxy:
+        ping_req = Ping(ping=N.ndarray(1000, dtype=N.float))
+        proxy.bad_call(ping_req).wait()
+    except:
+      pass
+    else:
+      assert False, 'Failed to raise exception.'
+  
+  def test_bad_swallow(self):
+    speedy.config.throw_remote_exceptions = False
+    with self._connect() as proxy:
+      ping_req = Ping(ping=N.ndarray(1000, dtype=N.float))
+      proxy.bad_call(ping_req).wait()
 
   def test_ping_no_reply(self):
     with self._connect() as proxy:

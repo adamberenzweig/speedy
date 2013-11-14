@@ -15,7 +15,7 @@ import types
 import cStringIO
 import cPickle
 
-from . import util
+from . import config, util
 
 RPC_ID = xrange(1000000000).__iter__()
 
@@ -185,6 +185,14 @@ class Future(object):
   def timed_out(self):
     return self._deadline < time.time()
 
+  def handle_exc(self, exc):
+    if config.throw_remote_exceptions:
+      raise exc
+    else:
+      util.log_info('Remote host threw an exception (ignored)')
+      util.log_info(exc)
+      return None
+
   def wait(self):
     self._cv.acquire()
     while not self.have_result and not self.timed_out():
@@ -195,11 +203,11 @@ class Future(object):
 #    util.log_info('Result from %s in %f seconds.', self.addr, time.time() - self._start)
 
     if not self.have_result and self.timed_out():
-      util.log_info('timed out!')
-      raise Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id)
+      return self.handle_exc(Exception('Timed out on remote call (%s %s)', self.addr, self.rpc_id))
 
     if isinstance(self.result, RPCException):
-      raise RemoteException(self.result.py_exc)
+      return self.handle_exc(RemoteException(self.result.py_exc))
+
     return self.result
 
   def on_finished(self, fn):
