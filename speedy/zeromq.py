@@ -1,23 +1,34 @@
 '''ZeroMQ socket implementation.'''
-import atexit
 
+import cProfile
 import collections
-
 import os
 import threading
-import time
-import sys
-import traceback
-
+import socket
 import zmq
 
 from .common import Group, SocketBase
+from spartan import util
+
+POLLER = None
+POLLER_LOCK = threading.RLock()
+PROFILER = None
+
+def poller():
+  global POLLER
+  with POLLER_LOCK:
+    if POLLER is None:
+      util.log_info('Started poller.. %s %s', os.getpid(), __file__)
+      POLLER = ZMQPoller()
+      POLLER.start()
+    return POLLER
 
 
 class Socket(SocketBase):
-  # __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
+  __slots__ = ['_zmq', '_hostport', '_out', '_in', '_addr', '_closed', '_shutdown', '_lock']
+
   def __init__(self, ctx, sock_type, hostport):
-    # util.log('New socket...')
+    # util.log_info('New socket...')
     self._zmq = ctx.socket(sock_type)
     self.addr = hostport
     self._out = collections.deque()
@@ -26,26 +37,27 @@ class Socket(SocketBase):
     self._lock = threading.RLock()
 
   def in_poll_loop(self):
-    return threading.current_thread() == POLLER
+    return threading.current_thread() == poller()
 
   def __repr__(self):
-    return 'Socket(%s)' % (self.addr)
+    return 'Socket(%s)' % ((self.addr,))
 
   def flush(self):
     self.handle_write()
 
   def close(self, *args):
     if self.in_poll_loop():
-      POLLER.remove(self)
+      poller().remove(self)
       self.handle_close()
     else:
       self._shutdown = True
-      POLLER.close(self)
+      poller().close(self)
 
   def send(self, msg):
     assert not self._closed
+    #util.log_info('SEND %s', len(msg))
     self._out.append(msg)
-    POLLER.modify(self, zmq.POLLIN | zmq.POLLOUT)
+    poller().modify(self, zmq.POLLIN | zmq.POLLOUT)
 
   def zmq(self):
     return self._zmq
@@ -59,9 +71,9 @@ class Socket(SocketBase):
   def connect(self):
     assert self._closed
     self._closed = False
-    #    util.log('Connecting: %s:%d' % self.addr)
+    #util.log_info('Connecting: %s:%d' % self.addr)
     self._zmq.connect('tcp://%s:%s' % self.addr)
-    POLLER.add(self, zmq.POLLIN)
+    poller().add(self, zmq.POLLIN)
 
   @property
   def port(self):
@@ -72,22 +84,23 @@ class Socket(SocketBase):
     return self.addr[0]
 
   def handle_close(self):
+    self.flush()
     self._closed = True
     self._zmq.close()
-    del self._zmq
+    #del self._zmq
 
   def handle_write(self):
     with self._lock:
       while self._out:
         next = self._out.popleft()
         if isinstance(next, Group):
-          # util.log('Sending %s', next.args)
+          #util.log_info('Sending group. %s', len(next))
           self._zmq.send_multipart(next, copy=False)
         else:
-          # util.log('Sending %s', next)
+          #util.log_info('Sending %s', len(next))
           self._zmq.send(next, copy=False)
 
-      POLLER.modify(self, zmq.POLLIN)
+      poller().modify(self, zmq.POLLIN)
 
   def handle_read(self, socket):
     self._handler(socket)
@@ -107,14 +120,15 @@ class ServerSocket(Socket):
 
   def bind(self):
     assert self._closed
-    #    util.log('Binding...')
     self._closed = False
     host, port = self.addr
+    host = socket.gethostbyname(host)
+    util.log_info('Binding... %s', (host, port))
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))
     else:
-      self._zmq.bind('tcp://%s:%d' % self.addr)
-    POLLER.add(self, zmq.POLLIN)
+      self._zmq.bind('tcp://%s:%d' % (host, port))
+    poller().add(self, zmq.POLLIN)
 
   def handle_read(self, socket):
     packet = self._zmq.recv_multipart(copy=False, track=False)
@@ -128,6 +142,7 @@ class ServerSocket(Socket):
 
 class StubSocket(SocketBase):
   '''Handles a single read from a client'''
+
   def __init__(self, source, socket, data):
     self._out = collections.deque()
     self.source = source
@@ -168,33 +183,66 @@ class ZMQPoller(threading.Thread):
     self._sockets = {}
 
     self._closing = {}
+    self._running = False
+
+    self._to_add = []
+    self._to_del = []
+    self._to_mod = []
+
+    self._epoch = 0
+
     self.setDaemon(True)
 
   def _run(self):
     self._running = True
     _poll = self._poller.poll
+    _poll_time = 1
+    MAX_TIMEOUT = 100
 
     while self._running:
-      socks = dict(_poll(100))
+      socks = dict(_poll(_poll_time))
+      
+      if len(socks) == 0:
+        _poll_time = min(_poll_time * 2, MAX_TIMEOUT)
+      else:
+        _poll_time = 1
+
+      #util.log_info('%s', self._sockets)
+      for fd, event in socks.iteritems():
+        if fd == self._pipe[0]:
+          os.read(fd, 1)
+          continue
+
+        if not fd in self._sockets:
+          continue
+
+        socket = self._sockets[fd]
+        if event & zmq.POLLIN:
+          socket.handle_read(socket)
+        if event & zmq.POLLOUT:
+          socket.handle_write()
+      
       with self._lock:
-        for fd, event in socks.iteritems():
-          if fd == self._pipe[0]:
-            os.read(fd, 1)
-            continue
+        for s, dir in self._to_add:
+          self._sockets[s.zmq()] = s
+          self._poller.register(s.zmq(), dir)
+          
+        for s, dir in self._to_mod:
+          self._poller.register(s.zmq(), dir)
 
-          if not fd in self._sockets:
-            # util.log('Handler for %s disappeared...', fd)
-            continue
-
-          socket = self._sockets[fd]
-          if event & zmq.POLLIN:
-            socket.handle_read(socket)
-          if event & zmq.POLLOUT:
-            socket.handle_write()
+        for s in self._to_del:
+          del self._sockets[s.zmq()]
+          self._poller.unregister(s.zmq())
+        
+        del self._to_mod[:]
+        del self._to_add[:]
+        del self._to_del[:]
 
         for socket in self._closing.keys():
           socket.handle_close()
         self._closing.clear()
+      
+      self._epoch += 1
 
   def close(self, socket):
     'Execute socket.handle_close() from within the polling thread.'
@@ -217,50 +265,34 @@ class ZMQPoller(threading.Thread):
 
   def modify(self, socket, direction):
     with self._lock:
-      self._poller.modify(socket.zmq(), direction)
+      self._to_mod.append((socket, direction))
       self.wakeup()
 
   def add(self, socket, direction):
-    self._sockets[socket.zmq()] = socket
+    util.log_info('Add %s', socket.zmq())
     with self._lock:
-      self._poller.register(socket.zmq(), direction)
+      self._to_add.append((socket, direction))
       self.wakeup()
 
   def remove(self, socket):
     with self._lock:
-      self._poller.unregister(socket.zmq())
-      del self._sockets[socket.zmq()]
+      assert socket.zmq() in self._sockets
+      self._to_del.append(socket)
+      self.wakeup()
 
-
-CTX, POLLER = None, None
-
-
-def init(*args):
-  global CTX
-  global POLLER
-  if CTX is not None:
-    return
-
-  CTX = zmq.Context()
-  POLLER = ZMQPoller()
-  POLLER.start()
-
-  import atexit
-  atexit.register(shutdown)
 
 def shutdown():
-  global POLLER
-  if POLLER:
-    POLLER.stop()
-  POLLER = None
+  poller().stop()
+
+
+import atexit
+atexit.register(shutdown)
 
 def server_socket(addr):
   host, port = addr
-  init()
-  return ServerSocket(CTX, zmq.ROUTER, (host, port))
+  return ServerSocket(zmq.Context.instance(), zmq.ROUTER, (host, port))
 
 
 def client_socket(addr):
   host, port = addr
-  init()
-  return Socket(CTX, zmq.DEALER, (host, port))
+  return Socket(zmq.Context.instance(), zmq.DEALER, (host, port))

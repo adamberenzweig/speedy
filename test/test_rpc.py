@@ -1,12 +1,30 @@
 #!/usr/bin/env python
 
+import logging
+import sys
+logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
+
+import time
 import threading
 import unittest
+import signal
 
 import numpy as N
 import speedy
 from speedy import zeromq, wait_for_all, util
 from numpy.random import randn
+
+
+def sig_handler(sig, frame):
+  import threading
+  import sys
+  import traceback
+
+  for thread_id, stack in sys._current_frames().items():
+    print '-' * 100
+    traceback.print_stack(stack)
+
+signal.signal(signal.SIGQUIT, sig_handler)
 
 class Empty(object):
   pass
@@ -26,6 +44,8 @@ class EchoWorker(speedy.Server):
     speedy.Server.__init__(self, *args, **kw)
 
   def ping(self, handle, req):
+    util.log_info('%s', req.ping)
+    #time.sleep(0.01)
     handle.done(Pong(pong=req.ping))
 
   def thread_ping(self, handle, req):
@@ -41,18 +61,22 @@ class PingWorker(threading.Thread):
     self.client = speedy.Client(zeromq.client_socket(addr))
 
   def run(self):
-    content = randn(100)
-    req = Ping(ping=content)
     futures = []
     for x in range(100):
+      content = '%s.%d' % (threading.current_thread().name, x)
+      req = Ping(ping=content)
       futures.append(self.client.ping(req))
 
     results = wait_for_all(futures)
-    for r in results : assert N.all(r.pong == content)
+
+    #for idx, r in enumerate(results):
+    #  content = '%s.%d' % (threading.current_thread().name, idx)
+    #  assert N.all(r.pong == content)
     self.client.close()
 
 class RPCTest(unittest.TestCase):
   def setUp(self):
+    util.log_info('HERE')
     self.server = EchoWorker(zeromq.server_socket(('127.0.0.1', -1)))
     self.server.serve_nonblock()
 
@@ -63,6 +87,7 @@ class RPCTest(unittest.TestCase):
     return speedy.Client(zeromq.client_socket(self.server.addr))
 
   def test_sendrecv(self):
+    util.log_info('sendrecv')
     with self._connect() as proxy:
       ping_req = proxy.ping(Ping(ping='Hello!'))
       res = ping_req.wait()
@@ -105,7 +130,7 @@ class RPCTest(unittest.TestCase):
         futures[i].wait()
 
   def test_concurrent_send(self):
-    workers = [PingWorker(self.server.addr) for x in range(50)]
+    workers = [PingWorker(self.server.addr) for x in range(10)]
     for w in workers: w.start()
     for w in workers: w.join()
 
