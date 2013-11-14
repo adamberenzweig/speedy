@@ -8,7 +8,7 @@ import socket
 import zmq
 
 from .common import Group, SocketBase
-from spartan import util
+from . import util
 
 POLLER = None
 POLLER_LOCK = threading.RLock()
