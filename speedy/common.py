@@ -236,11 +236,19 @@ def wait_for_all(futures):
   return [f.wait() for f in futures]
 
 
+def run_rpc(server, rpc_name, rpc, req):
+  # Python can't pickle bound methods, so we can't pass the result of getattr (a bound method)
+  # to pool.run_async.  Instead, pass the object and rpc name and bind here.
+  rpc_handler = getattr(server, rpc_name)
+  rpc_handler(rpc, req)
+
+
 class Server(object):
-  def __init__(self, socket):
+  def __init__(self, socket, thread_pool=None):
     self._socket = socket
     self._socket.register_handler(self.handle_read)
     self._running = False
+    self._thread_pool = thread_pool
 
   def diediedie(self, handle, req):
     handle.done(None)
@@ -270,24 +278,38 @@ class Server(object):
 
     #util.log_info('Reading: %s %s', self._socket.addr, header['rpc_id'])
     handle = PendingRequest(socket, header['rpc_id'])
-    name = header['method']
+    rpc_name = header['method']
 
+    # This is basically equivalent to hasattr, but we want to handle the exception here.
     try:
-      fn = getattr(self, name)
+      rpc_handler = getattr(self, rpc_name)
     except KeyError:
       handle.done(capture_exception())
       return
 
     try:
+      # Run the handler on the process pool, not on this thread.
+      # Handler is responsible for calling handle.done on the result.
+      # TODO(madadam): Maybe better to wrap this in a function that runs the handler and then
+      # calls handle.done() so the programmer can't forget.  The rpc handlers must return a
+      # (result, status) tuple, and we can check the value in the wrapper.  Would need to change
+      # a bunch of code that calls handle.done() early on exceptions/errors.
       req = read(reader)
-      result = fn(handle, req)
-      assert result is None, 'non-None result from RPC handler (use handle.done())'
+      # TODO(madadam): put the req into the PendingRequest object, stop passing around both.
+      args = (self, rpc_name, handle, req)
+      if self._thread_pool:
+        self._thread_pool.apply_async(run_rpc, args)
+      else:
+        run_rpc(*args)
     except:
-      util.log_info('Caught exception in handler.', exc_info=1)
+      util.log_info('Exception in handle_read.', exc_info=1)
       handle.done(capture_exception())
 
   def shutdown(self):
     self._running = 0
+    if self._threadpool:
+      self._threadpool.close()
+      self._threadpool.join()
     self._socket.close()
     del self._socket
 

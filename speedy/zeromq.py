@@ -4,7 +4,6 @@ import cProfile
 import collections
 import os
 import threading
-import socket
 import zmq
 
 from .common import Group, SocketBase
@@ -122,7 +121,6 @@ class ServerSocket(Socket):
     assert self._closed
     self._closed = False
     host, port = self.addr
-    host = socket.gethostbyname(host)
     util.log_info('Binding... %s', (host, port))
     if port == -1:
       self.addr = (host, self._zmq.bind_to_random_port('tcp://%s' % host))
